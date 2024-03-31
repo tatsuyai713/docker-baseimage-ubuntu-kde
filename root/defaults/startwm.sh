@@ -1,8 +1,11 @@
 #!/bin/bash
 
-if [ -f "${HOME}"/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml ]; then
-  sed -i \
-    '/use_compositing/c <property name="use_compositing" type="bool" value="false"/>' \
-    "${HOME}"/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml
+if [ ! -f $HOME/.config/kwinrc ]; then
+  kwriteconfig5 --file $HOME/.config/kwinrc --group Compositing --key Enabled false
 fi
-/usr/bin/xfce4-session > /dev/null 2>&1
+if [ ! -f $HOME/.config/kscreenlockerrc ]; then
+  kwriteconfig5 --file $HOME/.config/kscreenlockerrc --group Daemon --key Autolock false
+fi
+setterm blank 0
+setterm powerdown 0
+/usr/bin/dbus-launch /usr/bin/startplasma-x11 > /dev/null 2>&1

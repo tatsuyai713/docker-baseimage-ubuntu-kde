@@ -1,0 +1,6 @@
+#!/usr/bin/with-contenv bash
+
+# NodeJS wrapper
+cd /kclient
+exec s6-setuidgid <user> \
+  node index.js
