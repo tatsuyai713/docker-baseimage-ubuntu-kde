@@ -594,34 +594,12 @@ RUN \
 
 
 RUN userdel -r $(getent passwd 1000 | cut -d: -f1)
-RUN echo "**** create user and make our folders ****" && \
-  useradd -u 1000 -U -d /home/tatsuyai -s /bin/false tatsuyai && \
-  usermod -G users tatsuyai && \
-  echo "tatsuyai:tatsuyai" | chpasswd && \
-  usermod -s /bin/bash tatsuyai && \
-  usermod -aG sudo tatsuyai && \
-  usermod -aG docker tatsuyai && \
-  mkdir /home/tatsuyai && \
-  chown -R tatsuyai:tatsuyai /home/tatsuyai
 
 # add local files
 COPY /root /
 
-COPY replace.sh /
-RUN chmod +x /replace.sh
-RUN /replace.sh /etc/apt "<user>" "tatsuyai"
-RUN /replace.sh /etc/apt "<uid>" "1000"
-RUN /replace.sh /etc/cups "<user>" "tatsuyai"
-RUN /replace.sh /etc/cups "<uid>" "1000"
-RUN /replace.sh /etc/s6-overlay "<user>" "tatsuyai"
-RUN /replace.sh /etc/s6-overlay "<uid>" "1000"
-RUN sed -i s/"<user>"/"tatsuyai"/g /kasminit 
-RUN rm /replace.sh 
 RUN rm -rf /config
 RUN mkdir /config
 
-ENV HOME /home/tatsuyai
-
 # ports and volumes
 EXPOSE 3000
-# VOLUME /config
