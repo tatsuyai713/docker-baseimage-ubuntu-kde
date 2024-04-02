@@ -3,20 +3,6 @@
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 cd $SCRIPT_DIR
 
-
-RESOLUTION_W="1920"
-RESOLUTION_H="1080"
-
-function InputPassword() {
-	echo "Please input User Password."
-	read input
-	if [ -z $input ]; then
-		InputPassword
-	else
-		PASSWORD=$input
-	fi
-}
-
 NAME_IMAGE="docker-baseimage-ubuntu-kde_for_${USER}"
 DOCKER_NAME="docker-baseimage-ubuntu-kde_${USER}"
 
@@ -141,10 +127,8 @@ DOCKER_OPT="${DOCKER_OPT} \
 	-w ${DOCKER_WORK_DIR} \
 	-u ${USER} \
 	--shm-size=4096m \
-	-e SIZEW=${RESOLUTION_W} -e SIZEH=${RESOLUTION_H} -e REFRESH=60 -e DPI=96 -e CDEPTH=24 \
 	--tmpfs /dev/shm:rw \
-	-p 1$(id -u):8444 \
-	-p 2$(id -u):3389 \
+	-p 1$(id -u):3000 \
 	-e PULSE_SERVER=unix:/run/pulse/native \
 	--hostname $(hostname)-Docker \
 	--add-host $(hostname)-Docker:127.0.1.1"
@@ -164,81 +148,22 @@ CONTAINER_ID=$(docker ps -a | grep ${NAME_IMAGE}: | awk '{print $1}')
 # Run Container
 if [ ! "$CONTAINER_ID" ]; then
 	if [ ! $# -ne 1 ]; then
-		if [ "vnc" = $1 ]; then
-			InputPassword
-			DOCKER_OPT="${DOCKER_OPT} --gpus all "
-			docker run ${DOCKER_OPT} \
-				--name=${DOCKER_NAME} \
-				-it \
-				-e PASSWD=${PASSWORD} \
-				-e PULSE_COOKIE=/tmp/pulse/cookie \
-				-e PULSE_SERVER=unix:/tmp/pulse/native \
-				-v /run/user/$(id -u)/pulse/native:/tmp/pulse/native \
-				-v /home/$USER/.config/pulse/cookie:/tmp/pulse/cookie:ro \
-				-e SSL_ENABLE=${SSL_ENABLE} -e CERT_PATH="/home/$USER/host_home/ssl/" \
-				--entrypoint "/usr/bin/supervisord" \
-				${NAME_IMAGE}:latest
-			CONTAINER_ID=$(docker ps -a | grep ${NAME_IMAGE} | awk '{print $1}')
-			docker commit ${DOCKER_NAME} ${NAME_IMAGE}:latest
-			docker stop $CONTAINER_ID
-			docker rm $CONTAINER_ID -f
-		else
-			echo "Error"
-			exit
-		fi
-	elif [ ! $# -ne 2 ]; then
-		if [ "vnc" = $1 ]; then
-			PASSWORD=$2
-			DOCKER_OPT="${DOCKER_OPT} --gpus all "
-			docker run ${DOCKER_OPT} \
-				--name=${DOCKER_NAME} \
-				-e PASSWD=${PASSWORD} \
-				-e PULSE_COOKIE=/tmp/pulse/cookie \
-				-e PULSE_SERVER=unix:/tmp/pulse/native \
-				-v /run/user/$(id -u)/pulse/native:/tmp/pulse/native \
-				-v /home/$USER/.config/pulse/cookie:/tmp/pulse/cookie:ro \
-				-e SSL_ENABLE=${SSL_ENABLE} -e CERT_PATH="/home/$USER/host_home/ssl/" \
-				--entrypoint "/usr/bin/supervisord" \
-				${NAME_IMAGE}:latest
-			CONTAINER_ID=$(docker ps -a | grep ${NAME_IMAGE} | awk '{print $1}')
-			docker commit ${DOCKER_NAME} ${NAME_IMAGE}:latest
-			docker stop $CONTAINER_ID
-			docker rm $CONTAINER_ID -f
-		else
-			echo "Error"
-			exit
-		fi
-	elif [ ! $# -ne 3 ]; then
-		if [ "vnc" = $1 ]; then
-			PASSWORD=$2
-			GPU_OPT=""
-			if [ ! "none" = $3 ]; then
-				GPU_OPT="--gpus $3"
-			fi
-			docker run ${DOCKER_OPT} \
-				--name=${DOCKER_NAME} \
-				-e PASSWD=${PASSWORD} \
-				$GPU_OPT \
-				-e PULSE_COOKIE=/tmp/pulse/cookie \
-				-e PULSE_SERVER=unix:/tmp/pulse/native \
-				-v /run/user/$(id -u)/pulse/native:/tmp/pulse/native \
-				-v /home/$USER/.config/pulse/cookie:/tmp/pulse/cookie:ro \
-				-e SSL_ENABLE=${SSL_ENABLE} -e CERT_PATH="/home/$USER/host_home/ssl/" \
-				--entrypoint "/usr/bin/supervisord" \
-				${NAME_IMAGE}:latest
-			CONTAINER_ID=$(docker ps -a | grep ${NAME_IMAGE} | awk '{print $1}')
-			docker commit ${DOCKER_NAME} ${NAME_IMAGE}:latest
-			docker stop $CONTAINER_ID
-			docker rm $CONTAINER_ID -f
-		else
-			echo "Error"
-			exit
-		fi
-	else
+		DOCKER_OPT="${DOCKER_OPT} --gpus all "
 		docker run ${DOCKER_OPT} \
 			--name=${DOCKER_NAME} \
-			-it --entrypoint "bash" \
+			-it \
+			-e PULSE_COOKIE=/tmp/pulse/cookie \
+			-e PULSE_SERVER=unix:/tmp/pulse/native \
+			-v /run/user/$(id -u)/pulse/native:/tmp/pulse/native \
+			-v /home/$USER/.config/pulse/cookie:/tmp/pulse/cookie:ro \
 			${NAME_IMAGE}:latest
+		CONTAINER_ID=$(docker ps -a | grep ${NAME_IMAGE} | awk '{print $1}')
+		docker commit ${DOCKER_NAME} ${NAME_IMAGE}:latest
+		docker stop $CONTAINER_ID
+		docker rm $CONTAINER_ID -f
+	else
+		echo "Error"
+		exit
 	fi
 else
 	docker start $CONTAINER_ID

@@ -262,6 +262,21 @@ RUN tar -C /root-out -Jxpf /tmp/s6-overlay-symlinks-arch.tar.xz
 
 # Runtime stage
 FROM scratch
+# Make all NVIDIA GPUs visible by default
+ARG NVIDIA_VISIBLE_DEVICES=all
+# Use noninteractive mode to skip confirmation when installing packages
+ARG DEBIAN_FRONTEND=noninteractive
+# All NVIDIA driver capabilities should preferably be used, check `NVIDIA_DRIVER_CAPABILITIES` inside the container if things do not work
+ENV NVIDIA_DRIVER_CAPABILITIES all
+# Enable AppImage execution in a container
+ENV APPIMAGE_EXTRACT_AND_RUN 1
+# System defaults that should not be changed
+ENV DISPLAY :0
+ENV XDG_RUNTIME_DIR /tmp/runtime-user
+ENV PULSE_SERVER unix:/run/pulse/native
+ENV LD_LIBRARY_PATH /usr/lib/x86_64-linux-gnu:/usr/lib/i386-linux-gnu${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+
+
 COPY --from=rootfs-stage /root-out/ /
 ARG BUILD_DATE
 ARG VERSION
@@ -350,12 +365,6 @@ RUN \
     /var/lib/apt/lists/* \
     /var/tmp/* \
     /var/log/*
-
-# add local files
-COPY root/ /
-
-ENTRYPOINT ["/init"]
-
 
 # set version label
 ARG BUILD_DATE
@@ -500,13 +509,13 @@ RUN \
     -i /etc/sudoers && \
   echo "**** kasm support ****" && \
   mkdir -p /var/run/pulse && \
-  chown 1000:root /var/run/pulse && \
+  chown root:root /var/run/pulse && \
   mkdir -p /kasmbins && \
   curl -s https://kasm-ci.s3.amazonaws.com/kasmbins-amd64-${KASMBINS_RELEASE}.tar.gz \
     | tar xzvf - -C /kasmbins/ && \
   chmod +x /kasmbins/* && \
-  chown -R 1000:1000 /kasmbins && \
-  chown 1000:1000 /usr/share/kasmvnc/www/Downloads && \
+  chown -R root:root /kasmbins && \
+  chown root:root /usr/share/kasmvnc/www/Downloads && \
   echo "**** dind support ****" && \
   useradd -U dockremap && \
   usermod -G dockremap dockremap && \
@@ -531,14 +540,6 @@ RUN \
     /var/tmp/* \
     /tmp/*
 
-# # add local files
-# COPY /root /
-
-# # ports and volumes
-# EXPOSE 3000 3001
-# VOLUME /config
-
-
 
 # set version label
 ARG BUILD_DATE
@@ -549,6 +550,171 @@ ARG DEBIAN_FRONTEND="noninteractive"
 
 # title
 ENV TITLE="Ubuntu KDE"
+
+# Install locales to prevent X11 errors
+RUN apt-get clean && \
+    apt-get update && apt-get install -y locales && \
+    rm -rf /var/lib/apt/lists/* && \
+    locale-gen en_US.UTF-8
+
+ENV TZ UTC
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
+
+RUN dpkg --add-architecture i386 && \
+    apt-get update && apt-get install -y \
+    software-properties-common \
+    alsa-base \
+    alsa-utils \
+    apt-transport-https \
+    apt-utils \
+    build-essential \
+    ca-certificates \
+    cups-filters \
+    cups-common \
+    cups-pdf \
+    curl \
+    file \
+    wget \
+    bzip2 \
+    gzip \
+    p7zip-full \
+    xz-utils \
+    zip \
+    unzip \
+    zstd \
+    gcc \
+    git \
+    jq \
+    make \
+    python3 \
+    python3-cups \
+    python3-numpy \
+    python3-pip \
+    mlocate \
+    nano \
+    vim \
+    htop \
+    fonts-dejavu-core \
+    fonts-freefont-ttf \
+    fonts-noto \
+    fonts-noto-cjk \
+    fonts-noto-cjk-extra \
+    fonts-noto-color-emoji \
+    fonts-noto-hinted \
+    fonts-noto-mono \
+    fonts-opensymbol \
+    fonts-symbola \
+    fonts-ubuntu \
+    libpulse0 \
+    pulseaudio \
+    supervisor \
+    net-tools \
+    libglvnd-dev \
+    libglvnd-dev:i386 \
+    libgl1-mesa-dev \
+    libgl1-mesa-dev:i386 \
+    libegl1-mesa-dev \
+    libegl1-mesa-dev:i386 \
+    libgles2-mesa-dev \
+    libgles2-mesa-dev:i386 \
+    libglvnd0 \
+    libglvnd0:i386 \
+    libgl1 \
+    libgl1:i386 \
+    libglx0 \
+    libglx0:i386 \
+    libegl1 \
+    libegl1:i386 \
+    libgles2 \
+    libgles2:i386 \
+    libglu1 \
+    libglu1:i386 \
+    libsm6 \
+    libsm6:i386 \
+    vainfo \
+    vdpauinfo \
+    pkg-config \
+    mesa-utils \
+    mesa-utils-extra \
+    va-driver-all \
+    xserver-xorg-input-all \
+    xserver-xorg-video-all \
+    mesa-vulkan-drivers \
+    libvulkan-dev \
+    libvulkan-dev:i386 \
+    libxau6 \
+    libxau6:i386 \
+    libxdmcp6 \
+    libxdmcp6:i386 \
+    libxcb1 \
+    libxcb1:i386 \
+    libxext6 \
+    libxext6:i386 \
+    libx11-6 \
+    libx11-6:i386 \
+    libxv1 \
+    libxv1:i386 \
+    libxtst6 \
+    libxtst6:i386 \
+    xdg-utils \
+    dbus-x11 \
+    libdbus-c++-1-0v5 \
+    xkb-data \
+    x11-xkb-utils \
+    x11-xserver-utils \
+    x11-utils \
+    x11-apps \
+    xauth \
+    xbitmaps \
+    xinit \
+    xfonts-base \
+    libxrandr-dev \
+    vulkan-tools && \
+    rm -rf /var/lib/apt/lists/* && \
+    # Configure EGL manually
+    mkdir -p /usr/share/glvnd/egl_vendor.d/ && \
+    echo "{\n\
+    \"file_format_version\" : \"1.0.0\",\n\
+    \"ICD\": {\n\
+    \"library_path\": \"libEGL_nvidia.so.0\"\n\
+    }\n\
+    }" > /usr/share/glvnd/egl_vendor.d/10_nvidia.json
+
+# Configure Vulkan manually
+RUN VULKAN_API_VERSION=$(dpkg -s libvulkan1 | grep -oP 'Version: [0-9|\.]+' | grep -oP '[0-9]+(\.[0-9]+)(\.[0-9]+)') && \
+    mkdir -p /etc/vulkan/icd.d/ && \
+    echo "{\n\
+    \"file_format_version\" : \"1.0.0\",\n\
+    \"ICD\": {\n\
+    \"library_path\": \"libGLX_nvidia.so.0\",\n\
+    \"api_version\" : \"${VULKAN_API_VERSION}\"\n\
+    }\n\
+    }" > /etc/vulkan/icd.d/nvidia_icd.json
+
+ARG VIRTUALGL_VERSION=3.1
+# Install VirtualGL and make libraries available for preload
+ARG VIRTUALGL_URL="https://sourceforge.net/projects/virtualgl/files"
+RUN curl -fsSL -O "${VIRTUALGL_URL}/virtualgl_${VIRTUALGL_VERSION}_amd64.deb" && \
+    curl -fsSL -O "${VIRTUALGL_URL}/virtualgl32_${VIRTUALGL_VERSION}_amd64.deb" && \
+    apt-get update && apt-get install -y ./virtualgl_${VIRTUALGL_VERSION}_amd64.deb ./virtualgl32_${VIRTUALGL_VERSION}_amd64.deb && \
+    rm -f "virtualgl_${VIRTUALGL_VERSION}_amd64.deb" "virtualgl32_${VIRTUALGL_VERSION}_amd64.deb" && \
+    rm -rf /var/lib/apt/lists/* && \
+    chmod u+s /usr/lib/libvglfaker.so && \
+    chmod u+s /usr/lib/libdlfaker.so && \
+    chmod u+s /usr/lib32/libvglfaker.so && \
+    chmod u+s /usr/lib32/libdlfaker.so && \
+    chmod u+s /usr/lib/i386-linux-gnu/libvglfaker.so && \
+    chmod u+s /usr/lib/i386-linux-gnu/libdlfaker.so
+
+# Anything below this line should be always kept the same between docker-nvidia-glx-desktop and docker-nvidia-egl-desktop
+
+# Install KDE and other GUI packages
+ENV XDG_CURRENT_DESKTOP KDE
+ENV KWIN_COMPOSE N
+# Use sudoedit to change protected files instead of using sudo on kate
+ENV SUDO_EDITOR kate
 
 # prevent Ubuntu's firefox stub from being installed
 COPY /root/etc/apt/preferences.d/firefox-no-snap /etc/apt/preferences.d/firefox-no-snap
@@ -577,7 +743,67 @@ RUN \
     kwin-addons \
     kwin-x11 \
     kwrite \
-    plasma-desktop \
+    kde-plasma-desktop \
+    kwin-addons \
+    kwin-x11 \
+    kdeadmin \
+    akregator \
+    ark \
+    baloo-kf5 \
+    breeze-cursor-theme \
+    breeze-icon-theme \
+    debconf-kde-helper \
+    colord-kde \
+    desktop-file-utils \
+    filelight \
+    gwenview \
+    hspell \
+    kaddressbook \
+    kaffeine \
+    kate \
+    kcalc \
+    kcharselect \
+    kdeconnect \
+    kde-spectacle \
+    kde-config-screenlocker \
+    kde-config-updates \
+    kdf \
+    kget \
+    kgpg \
+    khelpcenter \
+    khotkeys \
+    kimageformat-plugins \
+    kinfocenter \
+    kio-extras \
+    kleopatra \
+    kmail \
+    kmenuedit \
+    kmix \
+    knotes \
+    kontact \
+    kopete \
+    korganizer \
+    krdc \
+    ktimer \
+    kwalletmanager \
+    librsvg2-common \
+    okular \
+    okular-extra-backends \
+    plasma-dataengines-addons \
+    plasma-discover \
+    plasma-runners-addons \
+    plasma-wallpapers-addons \
+    plasma-widgets-addons \
+    plasma-workspace-wallpapers \
+    qtvirtualkeyboard-plugin \
+    sonnet-plugins \
+    sweeper \
+    systemsettings \
+    xdg-desktop-portal-kde \
+    kubuntu-restricted-extras \
+    kubuntu-wallpapers \
+    pavucontrol-qt \
+    transmission-qt \
     plasma-workspace \
     qml-module-qt-labs-platform \
     systemsettings && \
@@ -585,12 +811,108 @@ RUN \
   sed -i \
     's/applications:org.kde.discover.desktop,/applications:org.kde.konsole.desktop,/g' \
     /usr/share/plasma/plasmoids/org.kde.plasma.taskmanager/contents/config/main.xml && \
+  apt-get install --install-recommends -y \
+      libreoffice \
+      libreoffice-style-breeze && \
+  rm -rf /var/lib/apt/lists/* && \
+  # Fix KDE startup permissions issues in containers
+  cp -f /usr/lib/x86_64-linux-gnu/libexec/kf5/start_kdeinit /tmp/ && \
+  rm -f /usr/lib/x86_64-linux-gnu/libexec/kf5/start_kdeinit && \
+  cp -r /tmp/start_kdeinit /usr/lib/x86_64-linux-gnu/libexec/kf5/start_kdeinit && \
+  rm -f /tmp/start_kdeinit && \
   echo "**** cleanup ****" && \
   apt-get autoclean && \
   rm -rf \
     /var/lib/apt/lists/* \
     /var/tmp/* \
     /tmp/*
+
+
+# install package
+RUN apt-get update && apt-get install -y \
+        build-essential \
+        curl \
+        sudo \
+        less \
+        apt-utils \
+        tzdata \
+        git \
+        tmux \
+        bash-completion \
+        command-not-found \
+        libglib2.0-0 \
+        vim \
+        emacs \
+        ssh \
+        rsync \
+        python3 \
+        python3-pip \
+        python3-dev \
+        sed \
+        ca-certificates \
+        wget \
+        gpg \
+        gpg-agent \
+        gpgconf \
+        gpgv \
+        locales \
+        unzip \
+        net-tools \
+        software-properties-common \
+        apt-transport-https \
+        lsb-release \
+        autoconf \
+        gnupg \
+        lsb-release \
+        less \
+        emacs \
+        tmux \
+        bash-completion \
+        command-not-found \
+        software-properties-common \
+        xdg-user-dirs \
+        iproute2 \
+        init \
+        systemd \
+        locales \
+        net-tools \
+        iputils-ping \
+        curl \
+        wget \
+        telnet \
+        less \
+        vim \
+        sudo \
+        tzdata \
+        locales \
+        g++ \
+        cmake \
+        libdbus-1-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# install ROS2 Humble
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
+RUN apt-get update && apt-get install -y \
+    ros-humble-desktop-full \
+    ros-dev-tools
+
+# install colcon and rosdep
+RUN apt-get update && apt-get install -y \
+    python3-colcon-common-extensions \
+    python3-rosdep
+
+RUN rosdep init 
+
+# install Chrome
+RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && echo "deb http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list
+
+RUN apt-get update && apt-get install -y \
+    google-chrome-stable && rm /etc/apt/sources.list.d/google.list
+
+# install nodejs 18
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+RUN apt-get update && apt-get install -y nodejs
 
 
 RUN userdel -r $(getent passwd 1000 | cut -d: -f1)
@@ -603,3 +925,5 @@ RUN mkdir /config
 
 # ports and volumes
 EXPOSE 3000
+
+ENTRYPOINT ["/init"]
